@@ -19,8 +19,6 @@ type OracleSource struct {
 	ct               []*sql.ColumnType
 }
 
-
-
 func NewOracleSource(connectionString string) (*OracleSource, error) {
 	logrus.Debug("connecting to oracle")
 	db, err := sql.Open("godror", connectionString)
@@ -61,7 +59,7 @@ func (s *OracleSource) SetExport(export *model.Export) (bool, []*sql.ColumnType,
 	var err error
 
 	// check if there are rows in the exported table
-	maxOrderColumnValueQuery :=  getMaxOrderColumnQuery(export)
+	maxOrderColumnValueQuery := getMaxOrderColumnQuery(export)
 	var maxOrderColumnValue sql.NullString
 	err = s.db.QueryRow(maxOrderColumnValueQuery).Scan(&maxOrderColumnValue)
 
@@ -123,9 +121,14 @@ func (s *OracleSource) GetRowsArrayInGoavro(scanArgs []interface{}) (GoAvroRows,
 			}
 
 			// TODO. switch to type switch? :-)
+			// TODO analyze for types frequency and reorder
 			if z, ok := (scanArgs[i]).(*sql.NullBool); ok {
 				if nullable {
-					row[v.Name()] = goavro.Union("boolean", z.Bool)
+					if z.Valid {
+						row[v.Name()] = goavro.Union("boolean", z.Bool)
+					} else {
+						row[v.Name()] = nil
+					}
 				} else {
 					row[v.Name()] = z.Bool
 				}
@@ -134,10 +137,17 @@ func (s *OracleSource) GetRowsArrayInGoavro(scanArgs []interface{}) (GoAvroRows,
 
 			if z, ok := (scanArgs[i]).(*sql.NullString); ok {
 				if nullable {
-					if z.String == "" {
-						row[v.Name()] = nil
+					if z.Valid {
+						// special check for string.
+						// TODO. configure this behaviour = something like assume empty string as null
+						if z.String == "" {
+							row[v.Name()] = nil
+						} else {
+							row[v.Name()] = goavro.Union("string", z.String)
+						}
+
 					} else {
-						row[v.Name()] = goavro.Union("string", z.String)
+						row[v.Name()] = nil
 					}
 				} else {
 					row[v.Name()] = z.String
@@ -148,7 +158,12 @@ func (s *OracleSource) GetRowsArrayInGoavro(scanArgs []interface{}) (GoAvroRows,
 
 			if z, ok := (scanArgs[i]).(*sql.NullInt64); ok {
 				if nullable {
-					row[v.Name()] = goavro.Union("int", z.Int64)
+					if z.Valid {
+						row[v.Name()] = goavro.Union("int", z.Int64)
+					} else {
+						row[v.Name()] = nil
+					}
+
 				} else {
 					row[v.Name()] = z.Int64
 				}
@@ -157,7 +172,12 @@ func (s *OracleSource) GetRowsArrayInGoavro(scanArgs []interface{}) (GoAvroRows,
 
 			if z, ok := (scanArgs[i]).(*sql.NullFloat64); ok {
 				if nullable {
-					row[v.Name()] = goavro.Union("float", z.Float64)
+					if z.Valid {
+						row[v.Name()] = goavro.Union("float", z.Float64)
+					} else {
+						row[v.Name()] = nil
+					}
+
 				} else {
 					row[v.Name()] = z.Float64
 				}
@@ -166,7 +186,11 @@ func (s *OracleSource) GetRowsArrayInGoavro(scanArgs []interface{}) (GoAvroRows,
 
 			if z, ok := (scanArgs[i]).(*sql.NullTime); ok {
 				if nullable {
-					row[v.Name()] = goavro.Union("long", z.Time.Unix())
+					if z.Valid {
+						row[v.Name()] = goavro.Union("long", z.Time.Unix())
+					} else {
+						row[v.Name()] = nil
+					}
 				} else {
 					row[v.Name()] = z.Time.Unix()
 				}

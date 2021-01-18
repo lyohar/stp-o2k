@@ -81,11 +81,7 @@ func (t *KafkaTarget) ExportGoAvroRowsToTarget(export *model.Export, schemaId in
 			operation string
 			)
 
-
 		for columnName, column := range row {
-
-			//logrus.Debug("kafka target. column_name: ", columnName, " column_value: ", column)
-
 			_, ok := columnsMap[columnName]
 			if !ok {
 				return nil, errors.New("column not found")
@@ -128,9 +124,7 @@ func (t *KafkaTarget) ExportGoAvroRowsToTarget(export *model.Export, schemaId in
 					if !ok {
 						return nil, errors.New("could not get order column value")
 					}
-
 				}
-
 			}
 		}
 
