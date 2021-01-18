@@ -1,11 +1,11 @@
 source:
-  connection_string: "ods/odsods_123@ods2_tst"
+  connection_string: "ods2/odsods_123@ods2_tst"
 
 target:
-  bootstrap_servers: "localhost:9091"
+  bootstrap_servers: "localhost:9092"
 
 schema_registry:
-  url: "localhost:8080"
+  url: "http://localhost:8081"
 
 manager:
   host: "localhost"

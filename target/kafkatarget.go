@@ -74,10 +74,17 @@ func (t *KafkaTarget) ExportGoAvroRowsToTarget(export *model.Export, schemaId in
 	for _, row := range rows{
 		outRow := map[string]interface{}{}
 		outKey := map[string]interface{}{}
-		var timestampFound, operationFound bool
-		var timestamp, operation interface{}
+
+		var (
+			timestampFound, operationFound bool
+			timestamp int64
+			operation string
+			)
+
 
 		for columnName, column := range row {
+
+			//logrus.Debug("kafka target. column_name: ", columnName, " column_value: ", column)
 
 			_, ok := columnsMap[columnName]
 			if !ok {
@@ -85,21 +92,45 @@ func (t *KafkaTarget) ExportGoAvroRowsToTarget(export *model.Export, schemaId in
 			}
 			outRow[columnName] = column
 
+			// TODO. should i really check all types in key columns or just passing a field is enough?
 			_, ok = keysMap[columnName]
-			if !ok {
+			if ok {
 				outKey[columnName] = column
 			}
 
 			if columnName == export.TimestampColumnName {
 				timestampFound = true
-				timestamp = column
+				timestamp, ok = column.(int64)
+				if !ok {
+					timestamp, ok = column.(map[string]interface{})["long"].(int64)
+					if !ok {
+						return nil, errors.New("could not get timestamp column value")
+					}
+				}
 			}
 
 			if columnName == export.OperationColumnName {
 				operationFound = true
-				operation = column
-				// TODO: get string of here
-				status.OrderColumnToValue = column.(string)
+				operation, ok = column.(string)
+				if !ok {
+					operation, ok = column.(map[string]interface{})["string"].(string)
+					if !ok {
+						return nil, errors.New("could not get operation column value")
+					}
+				}
+			}
+
+			// TODO. should order column value always be string?
+			if columnName == export.OrderColumnName {
+				status.OrderColumnToValue, ok = column.(string)
+				if !ok {
+					status.OrderColumnToValue, ok = column.(map[string]interface{})["string"].(string)
+					if !ok {
+						return nil, errors.New("could not get order column value")
+					}
+
+				}
+
 			}
 		}
 

@@ -22,6 +22,7 @@ func main() {
 	}
 
 	logrus.Debug("creating oracle source")
+	logrus.Debug(viper.GetString("source.connection_string"))
 	oracleSource, err := source.NewOracleSource(viper.GetString("source.connection_string"))
 	if err != nil {
 		logrus.Fatal("could not create oracle cource: ", err.Error())
@@ -44,6 +45,8 @@ func main() {
 
 	avro := avroUtils.NewAvro(schemaRegistryClient)
 
+	emptyCount := 0
+
 	for {
 		export, err := cli.GetExport()
 		if err != nil {
@@ -56,14 +59,10 @@ func main() {
 			logrus.Debug("got skip command, sleep")
 			time.Sleep(time.Second * 5)
 			continue
-		}
-
-		if export.Command == model.ExportQuitCommand {
+		} else if export.Command == model.ExportQuitCommand {
 			logrus.Info("got quit command, exiting")
 			break
-		}
-
-		if export.Command == model.ExportExecuteCommand {
+		} else if export.Command == model.ExportExecuteCommand {
 			empty, columns, err := oracleSource.SetExport(export)
 			if err != nil {
 				logrus.Error("could not set export for source: ", err.Error())
@@ -87,8 +86,16 @@ func main() {
 					// TODO. what should i do here
 					logrus.Error("could not set status")
 				}
+				if emptyCount == 5 {
+					logrus.Debug("too often empty requests, sleep 2 seconds")
+					time.Sleep(time.Second * 2)
+				} else {
+					emptyCount++
+				}
 				continue
 			}
+
+			emptyCount = 0
 
 			schemaAndArgs, err := avro.GetJSONSchemaAndScanArgsByExportAndColumnsList(export, columns)
 			if err != nil {
@@ -97,31 +104,33 @@ func main() {
 
 			schemaId, err := avro.GetSchemaIdByJSONSchemaAndScanArgs(export, schemaAndArgs)
 			if err != nil {
-
+				logrus.Fatal(err.Error())
 			}
 
 			goAvroRows, err := oracleSource.GetRowsArrayInGoavro(schemaAndArgs.ScanArgs)
 			if err != nil {
+				logrus.Fatal(err.Error())
 				// TODO error check
 			}
 
 			status, err := kafkaTarget.ExportGoAvroRowsToTarget(export, schemaId, schemaAndArgs.Schema, goAvroRows)
 			if err != nil {
+				logrus.Fatal(err.Error())
 				// TODO error schek
 			}
 
 			err = cli.SetExportStatus(status)
 			if err != nil {
 				// TODO. what should i do here
-				logrus.Error("could not set status")
+				logrus.Fatal(err.Error())
 			}
-
-
+		} else {
+			// should never be here
+			logrus.Error("unknown command: ", export.Command)
+			break
 		}
 
-		// should never be here
-		logrus.Error("unknown command: ", export.Command)
-		break
+
 
 	}
 
@@ -131,7 +140,7 @@ func main() {
 }
 
 func initConfig() error {
-	viper.AddConfigPath("/Users/aryabov/projects/stp/manager/config")
+	viper.AddConfigPath("/Users/aryabov/projects/stp-main/stp-o2k/config")
 	viper.SetConfigName("config")
 	return viper.ReadInConfig()
 }
