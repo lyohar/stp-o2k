@@ -1,0 +1,12 @@
+source:
+  connection_string: "ods/odsods_123@ods2_tst"
+
+target:
+  bootstrap_servers: "localhost:9091"
+
+schema_registry:
+  url: "localhost:8080"
+
+manager:
+  host: "localhost"
+  port: "8080"
